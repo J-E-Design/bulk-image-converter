@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Image Compressor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* gray-100 */
+        }
+        .drop-zone-active {
+            border-color: #2563eb; /* blue-600 */
+            background-color: #eff6ff; /* blue-50 */
+        }
+        #quality-slider:disabled {
+            background-color: #e5e7eb; /* gray-200 */
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+
+            <!-- Header -->
+            <header class="text-center mb-8">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Bulk Image Compressor</h1>
+                <p class="mt-2 text-gray-600">Optimize and resize multiple images right in your browser. Private, fast, and free.</p>
+            </header>
+
+            <!-- Upload Area -->
+            <section id="upload-section">
+                <div id="drop-zone" class="border-4 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer transition-colors duration-300 ease-in-out hover:border-blue-500 hover:bg-blue-50">
+                    <input type="file" id="file-input" multiple accept="image/jpeg, image/png, image/webp" class="hidden">
+                    <div class="flex flex-col items-center">
+                        <svg class="w-16 h-16 text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                        </svg>
+                        <p class="text-lg font-semibold text-gray-700">Drag & Drop images here</p>
+                        <p class="text-gray-500 mt-1">or</p>
+                        <button id="browse-btn" class="mt-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-transform transform hover:scale-105">
+                            Browse Files
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Controls -->
+            <section id="controls-section" class="mt-8 hidden">
+                <div class="bg-gray-50 p-6 rounded-xl border">
+                    <h2 class="text-xl font-bold mb-4 text-gray-800">Compression Settings</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="format-select" class="block text-sm font-medium text-gray-700 mb-1">Output Format</label>
+                            <select id="format-select" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="jpeg">JPEG</option>
+                                <option value="png">PNG</option>
+                                <option value="webp">WebP</option>
+                                <option value="avif">AVIF</option>
+                            </select>
+                        </div>
+                        <div id="quality-container">
+                            <label for="quality-slider" class="block text-sm font-medium text-gray-700 mb-1">Quality: <span id="quality-value" class="font-bold">75</span></label>
+                            <input id="quality-slider" type="range" min="0" max="100" value="75" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                    <!-- Resize Options -->
+                    <div class="mt-6 border-t pt-6">
+                         <div class="flex items-center">
+                            <input id="resize-toggle" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="resize-toggle" class="ml-3 block text-sm font-medium text-gray-900">Resize Images</label>
+                        </div>
+                        <div id="resize-options" class="hidden mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                            <div>
+                                <label for="resize-width" class="block text-sm font-medium text-gray-700">Max Width</label>
+                                <input type="number" id="resize-width" placeholder="e.g. 2000" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="resize-height" class="block text-sm font-medium text-gray-700">Max Height</label>
+                                <input type="number" id="resize-height" placeholder="e.g. 2000" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex flex-col sm:flex-row gap-4">
+                     <button id="start-btn" class="w-full sm:w-auto flex-grow bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 transition-transform transform hover:scale-105 flex items-center justify-center disabled:bg-gray-400 disabled:cursor-not-allowed">
+                        <svg class="w-6 h-6 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                        Start Compression
+                    </button>
+                    <button id="download-all-btn" class="w-full sm:w-auto bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-gray-800 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center" disabled>
+                        <svg class="w-6 h-6 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                        Download All (.zip)
+                    </button>
+                    <button id="clear-btn" class="w-full sm:w-auto bg-red-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-red-700 transition-transform transform hover:scale-105 flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.134H8.09a2.09 2.09 0 00-2.09 2.134v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                        Clear Queue
+                    </button>
+                </div>
+            </section>
+            
+            <!-- File List -->
+            <section id="file-list-section" class="mt-8">
+                <div id="file-list" class="space-y-3"></div>
+            </section>
+
+        </div>
+    </div>
+
+    <script type="module">
+        // This is our new Web Worker code, defined as a template string.
+        const workerCode = `
+            // The worker needs to import the libraries itself.
+            // Using esm.sh for browser-compatible ES modules.
+            import { encode as encodeJpeg } from 'https://esm.sh/@jsquash/jpeg@1.4.0';
+            import { encode as encodePng } from 'https://esm.sh/@jsquash/png@2.2.0';
+            import { encode as encodeWebp } from 'https://esm.sh/@jsquash/webp@1.3.0';
+            import { encode as encodeAvif } from 'https://esm.sh/@jsquash/avif@1.3.0';
+
+            // Listen for messages from the main thread.
+            self.onmessage = async (event) => {
+                const { file, options, id } = event.data;
+
+                try {
+                    const fileBuffer = await file.arrayBuffer();
+                    const imageBitmap = await createImageBitmap(new Blob([fileBuffer]));
+                    
+                    let targetWidth = imageBitmap.width;
+                    let targetHeight = imageBitmap.height;
+
+                    if (options.shouldResize && (options.maxWidth || options.maxHeight)) {
+                        const maxWidth = options.maxWidth || Infinity;
+                        const maxHeight = options.maxHeight || Infinity;
+
+                        if (imageBitmap.width > maxWidth || imageBitmap.height > maxHeight) {
+                            const widthRatio = maxWidth / imageBitmap.width;
+                            const heightRatio = maxHeight / imageBitmap.height;
+                            const scaleRatio = Math.min(widthRatio, heightRatio);
+
+                            targetWidth = imageBitmap.width * scaleRatio;
+                            targetHeight = imageBitmap.height * scaleRatio;
+                        }
+                    }
+                    
+                    const canvas = new OffscreenCanvas(Math.round(targetWidth), Math.round(targetHeight));
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height);
+                    const resizedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                    let compressedBuffer;
+                    const encoderOptions = {};
+                    if(options.format !== 'png') encoderOptions.quality = options.quality;
+                    
+                    if (options.format === 'jpeg') {
+                        compressedBuffer = await encodeJpeg(resizedImageData, encoderOptions);
+                    } else if (options.format === 'png') {
+                        compressedBuffer = await encodePng(resizedImageData);
+                    } else if (options.format === 'webp') {
+                        compressedBuffer = await encodeWebp(resizedImageData, encoderOptions);
+                    } else if (options.format === 'avif') {
+                        const avifQuality = Math.round(62 - (options.quality / 100) * 62);
+                        compressedBuffer = await encodeAvif(resizedImageData, { cqLevel: avifQuality, speed: 6 });
+                    }
+
+                    // Post the result back to the main thread
+                    self.postMessage({
+                        id,
+                        status: 'done',
+                        compressedBuffer: compressedBuffer,
+                    }, [compressedBuffer]); // The buffer is transferred, not copied, for performance.
+
+                } catch (e) {
+                    self.postMessage({
+                        id,
+                        status: 'error',
+                        error: e.message,
+                    });
+                }
+            };
+        `;
+
+        const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(workerBlob);
+
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const browseBtn = document.getElementById('browse-btn');
+        const controlsSection = document.getElementById('controls-section');
+        const fileList = document.getElementById('file-list');
+        const qualitySlider = document.getElementById('quality-slider');
+        const qualityValue = document.getElementById('quality-value');
+        const qualityContainer = document.getElementById('quality-container');
+        const formatSelect = document.getElementById('format-select');
+        const startBtn = document.getElementById('start-btn');
+        const downloadAllBtn = document.getElementById('download-all-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const resizeToggle = document.getElementById('resize-toggle');
+        const resizeOptions = document.getElementById('resize-options');
+        const resizeWidth = document.getElementById('resize-width');
+        const resizeHeight = document.getElementById('resize-height');
+        
+        let imageQueue = [];
+
+        // --- Event Listeners ---
+
+        browseBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drop-zone-active');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drop-zone-active');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drop-zone-active');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        qualitySlider.addEventListener('input', (e) => {
+            qualityValue.textContent = e.target.value;
+        });
+
+        resizeToggle.addEventListener('change', (e) => {
+            resizeOptions.classList.toggle('hidden', !e.target.checked);
+        });
+        
+        formatSelect.addEventListener('change', (e) => {
+            const isPng = e.target.value === 'png';
+            qualityContainer.style.visibility = isPng ? 'hidden' : 'visible';
+        });
+
+        startBtn.addEventListener('click', processQueue);
+        downloadAllBtn.addEventListener('click', downloadAllAsZip);
+        clearBtn.addEventListener('click', () => {
+             imageQueue = [];
+             updateFileListView();
+             controlsSection.classList.add('hidden');
+        });
+
+        // --- Functions ---
+
+        function handleFiles(files) {
+            const newFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+            if (newFiles.length === 0) return;
+
+            newFiles.forEach(file => {
+                imageQueue.push({
+                    file,
+                    id: `file-${Math.random().toString(36).substr(2, 9)}`,
+                    status: 'pending', // pending, compressing, done, error
+                    originalSize: file.size,
+                    compressedSize: null,
+                    compressedBlob: null,
+                });
+            });
+
+            updateFileListView();
+            controlsSection.classList.remove('hidden');
+            startBtn.disabled = false;
+        }
+
+        function updateFileListView() {
+            if (imageQueue.length === 0) {
+                 fileList.innerHTML = '';
+                 return;
+            }
+            
+            imageQueue.forEach(item => {
+                let fileElement = document.getElementById(item.id);
+                if (!fileElement) {
+                    fileElement = document.createElement('div');
+                    fileElement.id = item.id;
+                    fileList.appendChild(fileElement);
+                }
+                
+                fileElement.className = 'p-4 bg-gray-50 rounded-lg border flex flex-col sm:flex-row items-center justify-between gap-4';
+                
+                const statusIndicator = getStatusIndicator(item.status);
+
+                fileElement.innerHTML = `
+                    <div class="flex items-center gap-4 w-full sm:w-2/5">
+                        <div class="flex-shrink-0 w-6 h-6">${statusIndicator}</div>
+                        <div class="flex-grow min-w-0">
+                            <p class="font-semibold text-gray-800 truncate" title="${item.file.name}">${item.file.name}</p>
+                            <p class="text-sm text-gray-500">${formatBytes(item.originalSize)}</p>
+                        </div>
+                    </div>
+                    <div id="progress-${item.id}" class="w-full sm:w-1/5 text-center">
+                        ${item.status === 'done' ? `
+                            <p class="font-bold text-green-600">${formatBytes(item.compressedSize)}</p>
+                            <p class="text-sm font-semibold text-green-500">${getReductionPercent(item.originalSize, item.compressedSize)}% smaller</p>
+                        ` : item.status === 'error' ? `
+                            <p class="font-bold text-red-600">Error</p>
+                        ` : ''
+                        }
+                    </div>
+                    <div class="w-full sm:w-auto flex justify-end">
+                        <button id="download-${item.id}" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400" ${item.status !== 'done' ? 'disabled' : ''}>
+                            Download
+                        </button>
+                    </div>
+                `;
+
+                if (item.status === 'done') {
+                    fileElement.querySelector(`#download-${item.id}`).addEventListener('click', () => {
+                        const url = URL.createObjectURL(item.compressedBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = getNewFilename(item.file.name, formatSelect.value);
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    });
+                }
+            });
+        }
+        
+        async function processQueue() {
+            startBtn.disabled = true;
+            startBtn.innerHTML = '<svg class="w-5 h-5 mr-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Compressing...';
+            downloadAllBtn.disabled = true;
+
+            const options = {
+                quality: parseInt(qualitySlider.value, 10),
+                format: formatSelect.value,
+                shouldResize: resizeToggle.checked,
+                maxWidth: parseInt(resizeWidth.value, 10) || null,
+                maxHeight: parseInt(resizeHeight.value, 10) || null,
+            };
+
+            const tasksToRun = imageQueue.filter(item => item.status === 'pending');
+            const totalTasks = tasksToRun.length;
+            if (totalTasks === 0) {
+                 startBtn.innerHTML = '<svg.../>Start Compression'; // Reset button text
+                 return;
+            }
+
+            const concurrencyLimit = navigator.hardwareConcurrency || 4;
+            let completedTasks = 0;
+
+            const workerPool = [];
+
+            const onTaskComplete = () => {
+                completedTasks++;
+                if (completedTasks === totalTasks) {
+                    startBtn.disabled = true;
+                    startBtn.innerHTML = '<svg class="w-6 h-6 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>Start Compression';
+                    if (imageQueue.some(i => i.status === 'done')) {
+                        downloadAllBtn.disabled = false;
+                    }
+                    workerPool.forEach(w => w.terminate());
+                }
+            };
+
+            for (let i = 0; i < concurrencyLimit; i++) {
+                const worker = new Worker(workerUrl, { type: 'module' });
+                worker.onmessage = (e) => {
+                    const { id, status, compressedBuffer, error } = e.data;
+                    const item = imageQueue.find(i => i.id === id);
+
+                    if (item) {
+                        if (status === 'done') {
+                            item.status = 'done';
+                            item.compressedBlob = new Blob([compressedBuffer], { type: `image/${options.format}` });
+                            item.compressedSize = item.compressedBlob.size;
+                        } else {
+                            item.status = 'error';
+                            console.error(`Worker error for ${item.file.name}:`, error);
+                        }
+                        updateFileListView();
+                    }
+                    onTaskComplete();
+                    
+                    // Start next task on this worker if any are left
+                    if (tasksToRun.length > 0) {
+                         const nextItem = tasksToRun.shift();
+                         nextItem.status = 'compressing';
+                         updateFileListView();
+                         worker.postMessage({ file: nextItem.file, options, id: nextItem.id });
+                    }
+                };
+                 worker.onerror = (e) => {
+                    console.error('A worker encountered a fatal error:', e.message);
+                    onTaskComplete(); // Mark as complete to not stall the queue
+                 };
+                workerPool.push(worker);
+            }
+
+            // Start the initial batch of tasks
+            for (const worker of workerPool) {
+                if (tasksToRun.length > 0) {
+                    const item = tasksToRun.shift();
+                    item.status = 'compressing';
+                    updateFileListView();
+                    worker.postMessage({ file: item.file, options, id: item.id });
+                }
+            }
+        }
+        
+        async function downloadAllAsZip() {
+            const zip = new JSZip();
+            imageQueue.forEach(item => {
+                if (item.status === 'done' && item.compressedBlob) {
+                    const newName = getNewFilename(item.file.name, formatSelect.value);
+                    zip.file(newName, item.compressedBlob);
+                }
+            });
+
+            zip.generateAsync({ type: "blob" })
+                .then(function(content) {
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'compressed-images.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                });
+        }
+
+        // --- Helper Functions ---
+
+        function formatBytes(bytes, decimals = 2) {
+            if (!bytes || bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function getReductionPercent(original, compressed) {
+            if (!compressed || !original) return 0;
+            return Math.round(((original - compressed) / original) * 100);
+        }
+        
+        function getNewFilename(originalName, newExtension) {
+            const baseName = originalName.substring(0, originalName.lastIndexOf('.'));
+            return `${baseName}.${newExtension}`;
+        }
+
+        function getStatusIndicator(status) {
+            switch (status) {
+                case 'pending':
+                    return `<svg class="w-6 h-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+                case 'compressing':
+                    return `<svg class="w-6 h-6 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                case 'done':
+                    return `<svg class="w-6 h-6 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+                case 'error':
+                    return `<svg class="w-6 h-6 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>`;
+            }
+        }
+    </script>
+
+</body>
+</html>
